@@ -66,6 +66,8 @@ input, select, textarea { width: 100%; padding: 10px; font-size: 16px; border: 1
 .chip.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .big { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .big .ok { grid-column: 1 / -1; padding: 22px; font-size: 20px; }
+.trouble { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.trouble .missbtn { background: var(--miss); color: var(--card); }
 .missbtn { background: var(--miss-weak); color: var(--miss); border: 0; border-radius: 10px; padding: 14px 6px; font-size: 15px; font-weight: 600; }
 .muted { color: var(--muted); font-size: 13px; }
 textarea { font-family: inherit; line-height: 1.6; resize: vertical; }
@@ -112,6 +114,10 @@ const DEFAULT_CLUBS = ['1W','3W','5W','UT','5I','6I','7I','8I','9I','PW','AW','S
 const DEFAULT_MISSES = ['ダフリ','トップ','スライス','フック','引っかけ','プッシュ','テンプラ','シャンク','ショート','オーバー'];
 const LIES = { 1: '良い', 2: '普通', 3: '悪い' };
 const LIE_MARK = { 1: '◎', 2: '○', 3: '△' };
+// ラウンドだけで選べる結果。値は罰打数（スコアに足す）
+const ROUND_TROUBLES = { OB: 1, 'ペナルティ': 1, 'バンカー': 0 };
+const penaltyOf = s => (!s.ok && ROUND_TROUBLES[s.miss]) || 0;
+const strokesOf = shots => shots.reduce((a, s) => a + 1 + penaltyOf(s), 0);
 
 function load() {
   try {
@@ -342,21 +348,21 @@ function renderRound() {
   ui.club ??= db.clubs[0];
   const holeShots = r.shots.filter(x => x.hole === ui.hole);
   const par = r.pars[ui.hole - 1];
-  const total = r.shots.length;
+  const total = strokesOf(r.shots);
   return `
   <div class="card">
     <div class="holes">${Array.from({ length: 18 }, (_, i) => {
-      const h = i + 1, n = r.shots.filter(x => x.hole === h).length;
+      const h = i + 1, n = strokesOf(r.shots.filter(x => x.hole === h));
       return `<button class="${h === ui.hole ? 'on' : ''}" data-hole="${h}">${h}<small>${n || '-'}</small></button>`;
     }).join('')}</div>
     <div class="row" style="margin-top:10px">
-      <div><b style="font-size:18px">${ui.hole}番</b> <span class="muted">${holeShots.length}打</span></div>
+      <div><b style="font-size:18px">${ui.hole}番</b> <span class="muted">${strokesOf(holeShots)}打</span></div>
       <div><select id="parSel">${[3, 4, 5].map(p => `<option ${p === par ? 'selected' : ''} value="${p}">Par ${p}</option>`).join('')}</select></div>
       <div class="muted" style="text-align:right">合計 ${total}打</div>
     </div>
   </div>
   <div class="card">
-    <h2>${holeShots.length + 1}打目</h2>
+    <h2>${strokesOf(holeShots) + 1}打目</h2>
     <label>ライ</label>
     <div class="seg">${[1, 2, 3].map(l => `<button class="${l === ui.lie ? 'on' : ''}" data-lie="${l}">${LIE_MARK[l]} ${LIES[l]}</button>`).join('')}</div>
     <label>クラブ</label>${clubChips(ui.club)}
@@ -364,11 +370,13 @@ function renderRound() {
       <button class="btn ok" data-act="roundOk">◯ 成功</button>
       ${missButtons('roundMiss')}
     </div>
+    <div class="trouble">${Object.entries(ROUND_TROUBLES).map(([m, pen]) =>
+      `<button class="missbtn" data-act="roundMiss" data-miss="${esc(m)}">${esc(m)}${pen ? `<small style="display:block;font-weight:400">+${pen}打</small>` : ''}</button>`).join('')}</div>
   </div>
   <div class="card"><h2>${ui.hole}番の記録</h2>
     ${holeShots.length ? holeShots.map((s, i) => `<div class="list-item">
-      <div>${i + 1}. <b>${esc(s.club)}</b> <span class="lie${s.lie}">${LIE_MARK[s.lie]}${LIES[s.lie]}</span></div>
-      <div class="row" style="flex:0 0 auto"><span class="tag ${s.ok ? '' : 'miss'}">${s.ok ? '成功' : esc(s.miss)}</span>
+      <div>${strokesOf(holeShots.slice(0, i)) + 1}. <b>${esc(s.club)}</b> <span class="lie${s.lie}">${LIE_MARK[s.lie]}${LIES[s.lie]}</span></div>
+      <div class="row" style="flex:0 0 auto"><span class="tag ${s.ok ? '' : 'miss'}">${s.ok ? '成功' : esc(s.miss) + (penaltyOf(s) ? `（+${penaltyOf(s)}）` : '')}</span>
       <button class="chip" data-act="shotDel" data-id="${s.id}">✕</button></div></div>`).join('')
       : '<p class="muted">このホールはまだ記録がありません</p>'}
     ${ui.hole < 18 ? `<button class="btn sub block" style="margin-top:10px" data-act="nextHole">次のホールへ →</button>` : ''}
@@ -379,7 +387,7 @@ function renderRound() {
 }
 function scoreText(r) {
   const played = [...new Set(r.shots.map(s => s.hole))];
-  const strokes = r.shots.length;
+  const strokes = strokesOf(r.shots);
   const parSum = played.reduce((a, h) => a + r.pars[h - 1], 0);
   const diff = strokes - parSum;
   return `${strokes}打（${played.length}H, ${diff > 0 ? '+' : ''}${diff}）`;

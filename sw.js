@@ -1,5 +1,5 @@
 // オフライン用キャッシュ。index.html などを更新したら VERSION を上げる
-const VERSION = 'golf-v2';
+const VERSION = 'golf-v3';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
