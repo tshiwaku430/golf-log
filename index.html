@@ -52,7 +52,7 @@ nav button.on { color: var(--accent); font-weight: 700; }
 h2 { font-size: 16px; margin: 0 0 10px; }
 h3 { font-size: 14px; margin: 14px 0 8px; color: var(--muted); }
 label { font-size: 13px; color: var(--muted); display: block; margin: 8px 0 4px; }
-input, select { width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
+input, select, textarea { width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
 .btn { display: inline-block; border: 0; border-radius: 10px; padding: 12px 16px; font-size: 15px; font-weight: 600;
   background: var(--accent); color: var(--on-accent); cursor: pointer; }
 .btn.sub { background: var(--accent-weak); color: var(--accent); }
@@ -68,6 +68,9 @@ input, select { width: 100%; padding: 10px; font-size: 16px; border: 1px solid v
 .big .ok { grid-column: 1 / -1; padding: 22px; font-size: 20px; }
 .missbtn { background: var(--miss-weak); color: var(--miss); border: 0; border-radius: 10px; padding: 14px 6px; font-size: 15px; font-weight: 600; }
 .muted { color: var(--muted); font-size: 13px; }
+textarea { font-family: inherit; line-height: 1.6; resize: vertical; }
+.list-item > div:first-child { min-width: 0; }
+.memo-prev { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { padding: 7px 4px; text-align: left; border-bottom: 1px solid var(--line); }
 th { font-size: 12px; color: var(--muted); font-weight: 600; }
@@ -266,6 +269,17 @@ function missButtons(action) {
   return db.misses.map(m => `<button class="missbtn" data-act="${action}" data-miss="${esc(m)}">${esc(m)}</button>`).join('');
 }
 
+// 練習・ラウンドごとの「今日のメモ」。入力のたびに自動保存（下の input イベント）
+function memoCard(obj, placeholder) {
+  return `<div class="card"><h2>今日のメモ</h2>
+    <textarea id="memo" rows="4" placeholder="${esc(placeholder)}">${esc(obj.memo || '')}</textarea>
+    <p class="muted" style="margin:6px 0 0">入力した内容は自動で保存されます</p></div>`;
+}
+function memoPreview(obj) {
+  const line = (obj.memo || '').trim().split('\n')[0];
+  return line ? `<div class="muted memo-prev">📝 ${esc(line)}</div>` : '';
+}
+
 // ====== うちっぱなし ======
 function renderRange() {
   const s = db.rangeSessions.find(x => x.id === ui.rangeId);
@@ -295,7 +309,8 @@ function renderRange() {
       <button class="btn ghost" data-act="rangeUndo" style="flex:0 0 auto" ${last ? '' : 'disabled'}>↶ 取消</button>
     </div>
   </div>
-  <div class="card"><h2>今日のクラブ別</h2>${statTable(s.shots)}</div>`;
+  <div class="card"><h2>今日のクラブ別</h2>${statTable(s.shots)}</div>
+  ${memoCard(s, '例：7Iは右に出がち。グリップを少し強めにしたら安定した')}`;
 }
 function renderRangeList() {
   $('#title').textContent = 'うちっぱなし';
@@ -311,7 +326,7 @@ function renderRangeList() {
   <div class="card"><h2>履歴</h2>
     ${list.length ? list.map(s => {
       const ok = s.shots.filter(x => x.ok).length;
-      return `<div class="list-item"><div><b>${s.date}</b> ${esc(s.place)}<div class="muted">${s.shots.length}球・成功率${pct(ok, s.shots.length)}%</div></div>
+      return `<div class="list-item"><div><b>${s.date}</b> ${esc(s.place)}<div class="muted">${s.shots.length}球・成功率${pct(ok, s.shots.length)}%</div>${memoPreview(s)}</div>
       <div class="row" style="flex:0 0 auto"><button class="btn sub" data-act="rangeOpen" data-id="${s.id}">開く</button>
       <button class="btn danger" data-act="rangeDel" data-id="${s.id}">削除</button></div></div>`;
     }).join('') : '<p class="muted">まだ記録がありません</p>'}
@@ -359,7 +374,8 @@ function renderRound() {
     ${ui.hole < 18 ? `<button class="btn sub block" style="margin-top:10px" data-act="nextHole">次のホールへ →</button>` : ''}
   </div>
   <div class="card"><h2>このラウンドのクラブ別</h2>${statTable(r.shots)}
-    <h3>ライ別</h3>${lieTable(r.shots)}</div>`;
+    <h3>ライ別</h3>${lieTable(r.shots)}</div>
+  ${memoCard(r, '例：グリーンが速かった。前半はドライバーが安定、後半に疲れてダフリが増えた')}`;
 }
 function scoreText(r) {
   const played = [...new Set(r.shots.map(s => s.hole))];
@@ -383,7 +399,7 @@ function renderRoundList() {
   <div class="card"><h2>履歴</h2>
     ${list.length ? list.map(r => {
       const ok = r.shots.filter(x => x.ok).length;
-      return `<div class="list-item"><div><b>${r.date}</b> ${esc(r.course)}<div class="muted">${scoreText(r)}・成功率${pct(ok, r.shots.length)}%</div></div>
+      return `<div class="list-item"><div><b>${r.date}</b> ${esc(r.course)}<div class="muted">${scoreText(r)}・成功率${pct(ok, r.shots.length)}%</div>${memoPreview(r)}</div>
       <div class="row" style="flex:0 0 auto"><button class="btn sub" data-act="roundOpen" data-id="${r.id}">開く</button>
       <button class="btn danger" data-act="roundDel" data-id="${r.id}">削除</button></div></div>`;
     }).join('') : '<p class="muted">まだ記録がありません</p>'}
@@ -533,6 +549,11 @@ function importData(e) {
   }).catch(() => toast('ファイルを読み込めませんでした'));
 }
 
+document.addEventListener('input', e => {
+  if (e.target.id !== 'memo') return;
+  const obj = ui.tab === 'range' ? curRange() : curRound();
+  if (obj) { obj.memo = e.target.value; save(); }
+});
 document.addEventListener('click', e => {
   const el = e.target.closest('button'); if (!el) return;
   if (el.id === 'hdrBtn' && headerHandler) return headerHandler();
