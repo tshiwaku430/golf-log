@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ゴルフ記録</title>
+<meta name="theme-color" content="#1f6f43">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ゴルフ記録">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root {
+  --bg: #f4f6f3; --card: #fff; --text: #1d2420; --muted: #6b756f; --line: #dfe4e0;
+  --accent: #1f6f43; --accent-weak: #e3f1e8; --miss: #c0392b; --miss-weak: #fbe9e7;
+  --warn: #b7791f; --on-accent: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121614; --card: #1c211e; --text: #e8ece9; --muted: #98a29c; --line: #2d3430;
+    --accent: #4cc37f; --accent-weak: #1f3a2a; --miss: #ef6f5e; --miss-weak: #3a2320;
+    --warn: #e0a84a; --on-accent: #0f2418; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121614; --card: #1c211e; --text: #e8ece9; --muted: #98a29c; --line: #2d3430;
+  --accent: #4cc37f; --accent-weak: #1f3a2a; --miss: #ef6f5e; --miss-weak: #3a2320;
+  --warn: #e0a84a; --on-accent: #0f2418; color-scheme: dark;
+}
+:root { --header: #1f6f43; --header-fg: #fff; }
+.modal { position: fixed; inset: 0; background: #0008; display: flex; align-items: center; justify-content: center; z-index: 30; padding: 16px; }
+.modal .card { max-width: 360px; width: 100%; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--header); }
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--header); color: var(--header-fg);
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); font-weight: 700; font-size: 17px;
+  display: flex; justify-content: space-between; align-items: center; }
+header button { background: rgba(255,255,255,.18); color: var(--header-fg); border: 0; border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+main { padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 720px; margin: 0 auto; }
+nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: var(--card);
+  border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); z-index: 5; }
+nav button { flex: 1; border: 0; background: none; color: var(--muted); padding: 10px 0 12px; font-size: 13px; }
+nav button .ic { display: block; font-size: 20px; }
+nav button.on { color: var(--accent); font-weight: 700; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+h2 { font-size: 16px; margin: 0 0 10px; }
+h3 { font-size: 14px; margin: 14px 0 8px; color: var(--muted); }
+label { font-size: 13px; color: var(--muted); display: block; margin: 8px 0 4px; }
+input, select { width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
+.btn { display: inline-block; border: 0; border-radius: 10px; padding: 12px 16px; font-size: 15px; font-weight: 600;
+  background: var(--accent); color: var(--on-accent); cursor: pointer; }
+.btn.sub { background: var(--accent-weak); color: var(--accent); }
+.btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.btn.danger { background: var(--miss-weak); color: var(--miss); }
+.btn.block { width: 100%; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row > * { flex: 1; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 999px; padding: 8px 12px; font-size: 14px; min-width: 48px; }
+.chip.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.big { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.big .ok { grid-column: 1 / -1; padding: 22px; font-size: 20px; }
+.missbtn { background: var(--miss-weak); color: var(--miss); border: 0; border-radius: 10px; padding: 14px 6px; font-size: 15px; font-weight: 600; }
+.muted { color: var(--muted); font-size: 13px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 7px 4px; text-align: left; border-bottom: 1px solid var(--line); }
+th { font-size: 12px; color: var(--muted); font-weight: 600; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.bar { height: 6px; background: var(--miss-weak); border-radius: 3px; overflow: hidden; min-width: 50px; }
+.bar > i { display: block; height: 100%; background: var(--accent); }
+.list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); gap: 8px; }
+.list-item:last-child { border-bottom: 0; }
+.tag { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--accent-weak); color: var(--accent); white-space: nowrap; }
+.tag.miss { background: var(--miss-weak); color: var(--miss); }
+.holes { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; }
+.holes button { padding: 8px 0; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 13px; }
+.holes button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.holes button small { display: block; font-size: 10px; opacity: .75; }
+.lie1 { color: var(--accent); } .lie2 { color: var(--warn); } .lie3 { color: var(--miss); }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
+.seg button { flex: 1; border: 0; background: var(--card); color: var(--muted); padding: 10px; font-size: 14px; }
+.seg button.on { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.stat3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+.stat3 b { display: block; font-size: 22px; }
+.toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--text); color: var(--bg);
+  padding: 8px 14px; border-radius: 8px; font-size: 14px; z-index: 20; pointer-events: none; }
+</style>
+</head>
+<body>
+<header><span id="title">ゴルフ記録</span><span id="hdrAction"></span></header>
+<main id="app"></main>
+<nav>
+  <button data-tab="range"><span class="ic">🏌️</span>うちっぱなし</button>
+  <button data-tab="round"><span class="ic">⛳</span>ラウンド</button>
+  <button data-tab="stats"><span class="ic">📊</span>集計</button>
+  <button data-tab="settings"><span class="ic">⚙️</span>設定</button>
+</nav>
+
+<script>
+// ====== データ ======
+const STORE_KEY = 'golfLog.v1';
+const DEFAULT_CLUBS = ['1W','3W','5W','UT','5I','6I','7I','8I','9I','PW','AW','SW','PT'];
+const DEFAULT_MISSES = ['ダフリ','トップ','スライス','フック','引っかけ','プッシュ','テンプラ','シャンク','ショート','オーバー'];
+const LIES = { 1: '良い', 2: '普通', 3: '悪い' };
+const LIE_MARK = { 1: '◎', 2: '○', 3: '△' };
+
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (d && d.clubs) return d;
+  } catch (e) {}
+  return { clubs: [...DEFAULT_CLUBS], misses: [...DEFAULT_MISSES], rangeSessions: [], rounds: [] };
+}
+let db = load();
+
+// クラウド保存（claude.ai 上で開いたとき）。本人だけが読める data/users/<id>/ に、
+// 設定・練習・ラウンドを1件ずつ別ドキュメントで保存する。使えない環境では端末内のみ。
+let cloud = null, synced = {}, syncTimer = null, syncing = false, syncAgain = false;
+let syncState = 'connecting';
+function cloudDocs() {
+  const out = { settings: JSON.stringify({ kind: 'settings', clubs: db.clubs, misses: db.misses }) };
+  for (const s of db.rangeSessions) out['range_' + s.id] = JSON.stringify({ kind: 'range', ...s });
+  for (const r of db.rounds) out['round_' + r.id] = JSON.stringify({ kind: 'round', ...r });
+  return out;
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); } catch (e) {}
+  if (cloud) { clearTimeout(syncTimer); syncTimer = setTimeout(syncCloud, 600); }
+}
+async function syncCloud() {
+  if (syncing) { syncAgain = true; return; }
+  syncing = true;
+  try {
+    do {
+      syncAgain = false;
+      const want = cloudDocs();
+      for (const k of Object.keys(want)) {
+        if (want[k] === synced[k]) continue;
+        await cloud.doc(k).set(JSON.parse(want[k]));
+        synced[k] = want[k];
+      }
+      for (const k of Object.keys(synced)) {
+        if (k in want) continue;
+        await cloud.doc(k).delete();
+        delete synced[k];
+      }
+    } while (syncAgain);
+    setSync('cloud');
+  } catch (e) {
+    setSync('error');
+    toast('クラウドに保存できませんでした。通信を確認してください');
+  }
+  syncing = false;
+}
+function setSync(state) {
+  syncState = state;
+  if (ui.tab === 'settings') render();
+}
+async function initCloud() {
+  if (!window.claude?.use) return setSync('local');
+  const [store, user] = await Promise.all([claude.use('db'), claude.use('user')]);
+  const id = user ? await user.id() : null;
+  if (!store || !id) return setSync('local');
+  const col = store.collection('data/users/' + id);
+  try {
+    const snap = await col.limit(1000).get();
+    cloud = col;
+    if (snap.empty) {
+      // 初回: 端末内に記録があればクラウドへ移す
+      if (db.rangeSessions.length || db.rounds.length) save();
+      return setSync('cloud');
+    }
+    const next = { clubs: [...DEFAULT_CLUBS], misses: [...DEFAULT_MISSES], rangeSessions: [], rounds: [] };
+    for (const d of snap.docs) {
+      const v = structuredClone(d.data());
+      synced[d.id] = JSON.stringify(v);
+      const kind = v.kind; delete v.kind;
+      if (kind === 'settings') { next.clubs = v.clubs; next.misses = v.misses; }
+      else if (kind === 'range') next.rangeSessions.push(v);
+      else if (kind === 'round') next.rounds.push(v);
+    }
+    db = next;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); } catch (e) {}
+    if (ui.rangeId && !curRange()) ui.rangeId = null;
+    if (ui.roundId && !curRound()) ui.roundId = null;
+    syncState = 'cloud';
+    render();
+  } catch (e) { setSync('error'); }
+}
+
+// ブラウザの confirm() は使えない環境があるので、画面内で確認する
+function ask(message, okLabel, onOk) {
+  const m = document.createElement('div');
+  m.className = 'modal';
+  m.innerHTML = `<div class="card"><p style="margin:0 0 14px">${esc(message)}</p>
+    <div class="row"><button class="btn ghost" id="askNo">やめる</button><button class="btn danger" id="askYes">${esc(okLabel)}</button></div></div>`;
+  document.body.appendChild(m);
+  m.querySelector('#askNo').onclick = () => m.remove();
+  m.querySelector('#askYes').onclick = () => { m.remove(); onOk(); render(); };
+}
+
+const ui = { tab: 'range', rangeId: null, roundId: null, club: null, hole: 1, lie: 1, statsMode: 'range', statsClub: null };
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const today = () => new Date().toLocaleDateString('sv-SE');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct = (ok, n) => n ? Math.round(ok / n * 100) : 0;
+const $ = s => document.querySelector(s);
+
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 1200);
+}
+
+// shots: [{club, ok, miss, lie?}] → クラブ別集計
+function aggregate(shots, key = 'club') {
+  const m = {};
+  for (const s of shots) {
+    const k = s[key];
+    m[k] ??= { n: 0, ok: 0, misses: {} };
+    m[k].n++;
+    if (s.ok) m[k].ok++; else if (s.miss) m[k].misses[s.miss] = (m[k].misses[s.miss] || 0) + 1;
+  }
+  return m;
+}
+function clubOrder(a, b) {
+  const ia = db.clubs.indexOf(a), ib = db.clubs.indexOf(b);
+  return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+}
+function topMisses(misses, n = 3) {
+  return Object.entries(misses).sort((a, b) => b[1] - a[1]).slice(0, n)
+    .map(([k, v]) => `<span class="tag miss">${esc(k)} ${v}</span>`).join(' ');
+}
+function statTable(shots, { showMiss = true } = {}) {
+  const agg = aggregate(shots);
+  const clubs = Object.keys(agg).sort(clubOrder);
+  if (!clubs.length) return '<p class="muted">まだ記録がありません</p>';
+  return `<table><tr><th>クラブ</th><th class="num">回数</th><th class="num">成功率</th><th></th>${showMiss ? '<th>主なミス</th>' : ''}</tr>` +
+    clubs.map(c => {
+      const a = agg[c], p = pct(a.ok, a.n);
+      return `<tr><td><b>${esc(c)}</b></td><td class="num">${a.ok}/${a.n}</td><td class="num">${p}%</td>
+        <td><div class="bar"><i style="width:${p}%"></i></div></td>${showMiss ? `<td>${topMisses(a.misses, 2)}</td>` : ''}</tr>`;
+    }).join('') + '</table>';
+}
+function lieTable(shots) {
+  const agg = aggregate(shots, 'lie');
+  const rows = [1, 2, 3].filter(l => agg[l]);
+  if (!rows.length) return '<p class="muted">まだ記録がありません</p>';
+  return `<table><tr><th>ライ</th><th class="num">回数</th><th class="num">成功率</th><th></th></tr>` +
+    rows.map(l => {
+      const a = agg[l], p = pct(a.ok, a.n);
+      return `<tr><td class="lie${l}"><b>${LIE_MARK[l]} ${LIES[l]}</b></td><td class="num">${a.ok}/${a.n}</td><td class="num">${p}%</td><td><div class="bar"><i style="width:${p}%"></i></div></td></tr>`;
+    }).join('') + '</table>';
+}
+function clubChips(selected, attr = 'data-club') {
+  return `<div class="chips">${db.clubs.map(c =>
+    `<button class="chip ${c === selected ? 'on' : ''}" ${attr}="${esc(c)}">${esc(c)}</button>`).join('')}</div>`;
+}
+function missButtons(action) {
+  return db.misses.map(m => `<button class="missbtn" data-act="${action}" data-miss="${esc(m)}">${esc(m)}</button>`).join('');
+}
+
+// ====== うちっぱなし ======
+function renderRange() {
+  const s = db.rangeSessions.find(x => x.id === ui.rangeId);
+  if (!s) return renderRangeList();
+  $('#title').textContent = `うちっぱなし ${s.date}`;
+  setHeaderBtn('終了', () => { ui.rangeId = null; render(); });
+  ui.club ??= db.clubs[0];
+  const cur = s.shots.filter(x => x.club === ui.club);
+  const ok = cur.filter(x => x.ok).length;
+  const last = s.shots[s.shots.length - 1];
+  return `
+  <div class="card">
+    <h2>クラブ</h2>${clubChips(ui.club)}
+  </div>
+  <div class="card">
+    <div class="stat3">
+      <div><b>${esc(ui.club)}</b><span class="muted">選択中</span></div>
+      <div><b>${ok}/${cur.length}</b><span class="muted">成功/球数</span></div>
+      <div><b>${pct(ok, cur.length)}%</b><span class="muted">成功率</span></div>
+    </div>
+    <div class="big">
+      <button class="btn ok" data-act="rangeOk">◯ 成功</button>
+      ${missButtons('rangeMiss')}
+    </div>
+    <div class="row" style="margin-top:10px">
+      <span class="muted">${last ? `直前: ${esc(last.club)} ${last.ok ? '成功' : esc(last.miss)}` : '合計 0球'}（計${s.shots.length}球）</span>
+      <button class="btn ghost" data-act="rangeUndo" style="flex:0 0 auto" ${last ? '' : 'disabled'}>↶ 取消</button>
+    </div>
+  </div>
+  <div class="card"><h2>今日のクラブ別</h2>${statTable(s.shots)}</div>`;
+}
+function renderRangeList() {
+  $('#title').textContent = 'うちっぱなし';
+  setHeaderBtn();
+  const list = [...db.rangeSessions].sort((a, b) => b.date.localeCompare(a.date));
+  return `
+  <div class="card">
+    <h2>新しい練習を始める</h2>
+    <div class="row"><div><label>日付</label><input type="date" id="rDate" value="${today()}"></div>
+    <div><label>場所（任意）</label><input id="rPlace" placeholder="〇〇ゴルフセンター"></div></div>
+    <button class="btn block" style="margin-top:12px" data-act="rangeStart">練習開始</button>
+  </div>
+  <div class="card"><h2>履歴</h2>
+    ${list.length ? list.map(s => {
+      const ok = s.shots.filter(x => x.ok).length;
+      return `<div class="list-item"><div><b>${s.date}</b> ${esc(s.place)}<div class="muted">${s.shots.length}球・成功率${pct(ok, s.shots.length)}%</div></div>
+      <div class="row" style="flex:0 0 auto"><button class="btn sub" data-act="rangeOpen" data-id="${s.id}">開く</button>
+      <button class="btn danger" data-act="rangeDel" data-id="${s.id}">削除</button></div></div>`;
+    }).join('') : '<p class="muted">まだ記録がありません</p>'}
+  </div>`;
+}
+
+// ====== ラウンド ======
+function renderRound() {
+  const r = db.rounds.find(x => x.id === ui.roundId);
+  if (!r) return renderRoundList();
+  $('#title').textContent = r.course || 'ラウンド';
+  setHeaderBtn('一覧へ', () => { ui.roundId = null; render(); });
+  ui.club ??= db.clubs[0];
+  const holeShots = r.shots.filter(x => x.hole === ui.hole);
+  const par = r.pars[ui.hole - 1];
+  const total = r.shots.length;
+  return `
+  <div class="card">
+    <div class="holes">${Array.from({ length: 18 }, (_, i) => {
+      const h = i + 1, n = r.shots.filter(x => x.hole === h).length;
+      return `<button class="${h === ui.hole ? 'on' : ''}" data-hole="${h}">${h}<small>${n || '-'}</small></button>`;
+    }).join('')}</div>
+    <div class="row" style="margin-top:10px">
+      <div><b style="font-size:18px">${ui.hole}番</b> <span class="muted">${holeShots.length}打</span></div>
+      <div><select id="parSel">${[3, 4, 5].map(p => `<option ${p === par ? 'selected' : ''} value="${p}">Par ${p}</option>`).join('')}</select></div>
+      <div class="muted" style="text-align:right">合計 ${total}打</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>${holeShots.length + 1}打目</h2>
+    <label>ライ</label>
+    <div class="seg">${[1, 2, 3].map(l => `<button class="${l === ui.lie ? 'on' : ''}" data-lie="${l}">${LIE_MARK[l]} ${LIES[l]}</button>`).join('')}</div>
+    <label>クラブ</label>${clubChips(ui.club)}
+    <div class="big">
+      <button class="btn ok" data-act="roundOk">◯ 成功</button>
+      ${missButtons('roundMiss')}
+    </div>
+  </div>
+  <div class="card"><h2>${ui.hole}番の記録</h2>
+    ${holeShots.length ? holeShots.map((s, i) => `<div class="list-item">
+      <div>${i + 1}. <b>${esc(s.club)}</b> <span class="lie${s.lie}">${LIE_MARK[s.lie]}${LIES[s.lie]}</span></div>
+      <div class="row" style="flex:0 0 auto"><span class="tag ${s.ok ? '' : 'miss'}">${s.ok ? '成功' : esc(s.miss)}</span>
+      <button class="chip" data-act="shotDel" data-id="${s.id}">✕</button></div></div>`).join('')
+      : '<p class="muted">このホールはまだ記録がありません</p>'}
+    ${ui.hole < 18 ? `<button class="btn sub block" style="margin-top:10px" data-act="nextHole">次のホールへ →</button>` : ''}
+  </div>
+  <div class="card"><h2>このラウンドのクラブ別</h2>${statTable(r.shots)}
+    <h3>ライ別</h3>${lieTable(r.shots)}</div>`;
+}
+function scoreText(r) {
+  const played = [...new Set(r.shots.map(s => s.hole))];
+  const strokes = r.shots.length;
+  const parSum = played.reduce((a, h) => a + r.pars[h - 1], 0);
+  const diff = strokes - parSum;
+  return `${strokes}打（${played.length}H, ${diff > 0 ? '+' : ''}${diff}）`;
+}
+function renderRoundList() {
+  $('#title').textContent = 'ラウンド';
+  setHeaderBtn();
+  const list = [...db.rounds].sort((a, b) => b.date.localeCompare(a.date));
+  return `
+  <div class="card">
+    <h2>新しいラウンド</h2>
+    <div class="row"><div><label>日付</label><input type="date" id="rdDate" value="${today()}"></div>
+    <div><label>コース名</label><input id="rdCourse" placeholder="〇〇カントリー"></div></div>
+    <button class="btn block" style="margin-top:12px" data-act="roundStart">ラウンド開始</button>
+    <p class="muted">パットも PT で1打ずつ記録すると、スコアも自動で数えます。</p>
+  </div>
+  <div class="card"><h2>履歴</h2>
+    ${list.length ? list.map(r => {
+      const ok = r.shots.filter(x => x.ok).length;
+      return `<div class="list-item"><div><b>${r.date}</b> ${esc(r.course)}<div class="muted">${scoreText(r)}・成功率${pct(ok, r.shots.length)}%</div></div>
+      <div class="row" style="flex:0 0 auto"><button class="btn sub" data-act="roundOpen" data-id="${r.id}">開く</button>
+      <button class="btn danger" data-act="roundDel" data-id="${r.id}">削除</button></div></div>`;
+    }).join('') : '<p class="muted">まだ記録がありません</p>'}
+  </div>`;
+}
+
+// ====== 集計 ======
+function renderStats() {
+  $('#title').textContent = '集計'; setHeaderBtn();
+  const mode = ui.statsMode;
+  const shots = mode === 'range' ? db.rangeSessions.flatMap(s => s.shots)
+    : mode === 'round' ? db.rounds.flatMap(r => r.shots)
+    : [...db.rangeSessions.flatMap(s => s.shots), ...db.rounds.flatMap(r => r.shots)];
+  const clubsUsed = [...new Set(shots.map(s => s.club))].sort(clubOrder);
+  if (!clubsUsed.includes(ui.statsClub)) ui.statsClub = clubsUsed[0] ?? null;
+  const cs = shots.filter(s => s.club === ui.statsClub);
+  const missAgg = aggregate(cs)[ui.statsClub]?.misses || {};
+  const missTotal = Object.values(missAgg).reduce((a, b) => a + b, 0);
+
+  // うちっぱなし vs ラウンド比較
+  const rangeAgg = aggregate(db.rangeSessions.flatMap(s => s.shots));
+  const roundAgg = aggregate(db.rounds.flatMap(r => r.shots));
+  const both = [...new Set([...Object.keys(rangeAgg), ...Object.keys(roundAgg)])].sort(clubOrder);
+
+  return `
+  <div class="seg">
+    <button class="${mode === 'range' ? 'on' : ''}" data-mode="range">うちっぱなし</button>
+    <button class="${mode === 'round' ? 'on' : ''}" data-mode="round">ラウンド</button>
+    <button class="${mode === 'all' ? 'on' : ''}" data-mode="all">全部</button>
+  </div>
+  <div class="card"><h2>クラブ別成功率</h2>${statTable(shots)}</div>
+  ${mode !== 'range' ? `<div class="card"><h2>ライ別成功率（ラウンド）</h2>${lieTable(db.rounds.flatMap(r => r.shots))}</div>` : ''}
+  <div class="card"><h2>ミスの内訳</h2>
+    ${clubsUsed.length ? `<div class="chips">${clubsUsed.map(c => `<button class="chip ${c === ui.statsClub ? 'on' : ''}" data-sclub="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    ${missTotal ? `<table style="margin-top:8px">${Object.entries(missAgg).sort((a, b) => b[1] - a[1]).map(([k, v]) =>
+      `<tr><td>${esc(k)}</td><td class="num">${v}回</td><td class="num">${pct(v, missTotal)}%</td><td style="width:40%"><div class="bar" style="background:var(--line)"><i style="width:${pct(v, missTotal)}%;background:var(--miss)"></i></div></td></tr>`).join('')}</table>`
+      : '<p class="muted">ミスの記録はありません</p>'}` : '<p class="muted">まだ記録がありません</p>'}
+  </div>
+  <div class="card"><h2>練習 vs 本番</h2>
+    ${both.length ? `<table><tr><th>クラブ</th><th class="num">うちっぱなし</th><th class="num">ラウンド</th><th class="num">差</th></tr>
+    ${both.map(c => {
+      const a = rangeAgg[c], b = roundAgg[c];
+      const pa = a ? pct(a.ok, a.n) : null, pb = b ? pct(b.ok, b.n) : null;
+      const d = pa != null && pb != null ? pb - pa : null;
+      return `<tr><td><b>${esc(c)}</b></td><td class="num">${pa != null ? pa + '%' : '-'}</td><td class="num">${pb != null ? pb + '%' : '-'}</td>
+        <td class="num" style="color:${d == null ? 'inherit' : d < 0 ? 'var(--miss)' : 'var(--accent)'}">${d == null ? '-' : (d > 0 ? '+' : '') + d}</td></tr>`;
+    }).join('')}</table>` : '<p class="muted">まだ記録がありません</p>'}
+  </div>`;
+}
+
+// ====== 設定 ======
+function renderSettings() {
+  $('#title').textContent = '設定'; setHeaderBtn();
+  const editor = (key, label) => `
+    <div class="card"><h2>${label}</h2>
+      <div class="chips">${db[key].map((c, i) => `<button class="chip" data-act="listDel" data-key="${key}" data-i="${i}">${esc(c)} ✕</button>`).join('')}</div>
+      <div class="row" style="margin-top:10px"><input id="add-${key}" placeholder="追加する名前">
+      <button class="btn sub" style="flex:0 0 auto" data-act="listAdd" data-key="${key}">追加</button></div>
+    </div>`;
+  return editor('clubs', 'クラブ') + editor('misses', 'ミスの種類') + `
+    <div class="card"><h2>データ</h2>
+      <p class="muted">${{
+        cloud: '☁️ クラウドに保存中。同じアカウントなら他の端末からも同じ記録が見られます（自分だけが見られます）。',
+        connecting: 'クラウドに接続しています…',
+        error: '⚠️ クラウドに保存できていません。通信を確認してから操作し直してください。',
+        local: '📱 記録はこの端末の中に保存しています。消えないよう、ホーム画面に追加して使い、ときどきエクスポートでバックアップしてください。',
+      }[syncState]}</p>
+      ${syncState === 'local' ? '' : '<p class="muted">念のためのバックアップにはエクスポートを使ってください。</p>'}
+      <div class="row"><button class="btn sub" data-act="export">エクスポート</button>
+      <button class="btn sub" data-act="import">インポート</button></div>
+      <input type="file" id="importFile" accept="application/json" hidden>
+    </div>`;
+}
+
+// ====== 描画・操作 ======
+let headerHandler = null;
+function setHeaderBtn(label, fn) {
+  headerHandler = fn || null;
+  $('#hdrAction').innerHTML = label ? `<button id="hdrBtn">${label}</button>` : '';
+}
+function render() {
+  const views = { range: renderRange, round: renderRound, stats: renderStats, settings: renderSettings };
+  $('#app').innerHTML = views[ui.tab]();
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
+  const ps = $('#parSel');
+  if (ps) ps.onchange = () => { const r = curRound(); r.pars[ui.hole - 1] = +ps.value; save(); render(); };
+  const f = $('#importFile');
+  if (f) f.onchange = importData;
+}
+const curRange = () => db.rangeSessions.find(x => x.id === ui.rangeId);
+const curRound = () => db.rounds.find(x => x.id === ui.roundId);
+
+const actions = {
+  rangeStart() {
+    const s = { id: uid(), date: $('#rDate').value || today(), place: $('#rPlace').value.trim(), shots: [] };
+    db.rangeSessions.push(s); save(); ui.rangeId = s.id; ui.club = null;
+  },
+  rangeOpen(el) { ui.rangeId = el.dataset.id; ui.club = null; },
+  rangeDel(el) { ask('この練習記録を削除しますか？', '削除', () => { db.rangeSessions = db.rangeSessions.filter(x => x.id !== el.dataset.id); save(); }); },
+  rangeOk() { curRange().shots.push({ club: ui.club, ok: true }); save(); },
+  rangeMiss(el) { curRange().shots.push({ club: ui.club, ok: false, miss: el.dataset.miss }); save(); toast(`${ui.club}: ${el.dataset.miss}`); },
+  rangeUndo() { curRange().shots.pop(); save(); },
+  roundStart() {
+    const r = { id: uid(), date: $('#rdDate').value || today(), course: $('#rdCourse').value.trim(), pars: Array(18).fill(4), shots: [] };
+    db.rounds.push(r); save(); ui.roundId = r.id; ui.hole = 1; ui.lie = 1; ui.club = db.clubs[0];
+  },
+  roundOpen(el) {
+    ui.roundId = el.dataset.id;
+    const r = curRound();
+    ui.hole = r.shots.length ? r.shots[r.shots.length - 1].hole : 1; ui.lie = 1; ui.club = db.clubs[0];
+  },
+  roundDel(el) { ask('このラウンドを削除しますか？', '削除', () => { db.rounds = db.rounds.filter(x => x.id !== el.dataset.id); save(); }); },
+  roundOk() { addRoundShot(true); },
+  roundMiss(el) { addRoundShot(false, el.dataset.miss); },
+  shotDel(el) { const r = curRound(); r.shots = r.shots.filter(x => x.id !== el.dataset.id); save(); },
+  nextHole() { ui.hole = Math.min(18, ui.hole + 1); ui.lie = 1; ui.club = db.clubs[0]; },
+  listAdd(el) {
+    const k = el.dataset.key, inp = $('#add-' + k), v = inp.value.trim();
+    if (v && !db[k].includes(v)) { db[k].push(v); save(); }
+  },
+  listDel(el) {
+    const k = el.dataset.key, i = +el.dataset.i;
+    ask(`「${db[k][i]}」を外しますか？（過去の記録は残ります）`, '外す', () => { db[k].splice(i, 1); save(); });
+  },
+  async export() {
+    const filename = `golf-log-${today()}.json`, data = JSON.stringify(db, null, 2);
+    const dl = window.claude?.use ? await claude.use('downloads') : null;
+    if (dl) { try { await dl.save({ filename, data }); } catch (e) {} return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+    a.download = filename; a.click();
+  },
+  import() { $('#importFile').click(); },
+};
+function addRoundShot(ok, miss) {
+  const r = curRound();
+  r.shots.push({ id: uid(), hole: ui.hole, club: ui.club, lie: ui.lie, ok, ...(ok ? {} : { miss }) });
+  save(); toast(`${ui.hole}番 ${ui.club} ${ok ? '成功' : miss}`);
+  ui.lie = 1;
+}
+function importData(e) {
+  const file = e.target.files[0]; if (!file) return;
+  file.text().then(t => {
+    const d = JSON.parse(t);
+    if (!d.clubs || !d.rangeSessions || !d.rounds) throw new Error();
+    ask('現在のデータを上書きしてインポートしますか？', '上書き', () => { db = d; save(); toast('インポートしました'); });
+  }).catch(() => toast('ファイルを読み込めませんでした'));
+}
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('button'); if (!el) return;
+  if (el.id === 'hdrBtn' && headerHandler) return headerHandler();
+  if (el.dataset.tab) { ui.tab = el.dataset.tab; ui.club = ui.tab === 'round' ? db.clubs[0] : null; }
+  else if (el.dataset.club) ui.club = el.dataset.club;
+  else if (el.dataset.hole) { ui.hole = +el.dataset.hole; ui.lie = 1; }
+  else if (el.dataset.lie) ui.lie = +el.dataset.lie;
+  else if (el.dataset.mode) ui.statsMode = el.dataset.mode;
+  else if (el.dataset.sclub) ui.statsClub = el.dataset.sclub;
+  else if (el.dataset.act && actions[el.dataset.act]) actions[el.dataset.act](el);
+  else return;
+  render();
+});
+render();
+initCloud();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+navigator.storage?.persist?.().catch(() => {});
+</script>
+</body>
+</html>
