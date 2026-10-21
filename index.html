@@ -75,7 +75,7 @@ textarea { font-family: inherit; line-height: 1.6; resize: vertical; }
 .memo-prev { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { padding: 7px 4px; text-align: left; border-bottom: 1px solid var(--line); }
-th { font-size: 12px; color: var(--muted); font-weight: 600; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .bar { height: 6px; background: var(--miss-weak); border-radius: 3px; overflow: hidden; min-width: 50px; }
 .bar > i { display: block; height: 100%; background: var(--accent); }
@@ -407,7 +407,9 @@ function renderRoundSummary(r) {
   const strokes = strokesOf(r.shots);
   const putts = r.shots.filter(isPutt).length;
   const diff = strokes - played.reduce((a, h) => a + r.pars[h - 1], 0);
-  const pens = r.shots.filter(penaltyOf).length;
+  const cnt = m => r.shots.filter(s => !s.ok && s.miss === m).length;
+  const ob = cnt('OB'), pre4 = cnt('OB プレ4'), penalty = cnt('ペナルティ'), bunker = cnt('バンカー');
+  const penStrokes = r.shots.reduce((a, s) => a + penaltyOf(s), 0);
   const half = (from) => {
     const hs = Array.from({ length: 9 }, (_, i) => from + i);
     const sc = h => strokesOf(r.shots.filter(s => s.hole === h));
@@ -430,10 +432,16 @@ function renderRoundSummary(r) {
       <div><b>${strokes}</b><small>スコア（${diff > 0 ? '+' : ''}${diff}）</small></div>
       <div><b>${putts}</b><small>パット</small></div>
     </div>
-    <p class="muted" style="margin:10px 0 0;text-align:center">${played.length}ホール・1ホール平均 ${played.length ? (putts / played.length).toFixed(1) : 0}パット${pens ? `・OB/ペナルティ ${pens}回` : ''}</p>
+    <p class="muted" style="margin:10px 0 0;text-align:center">${played.length}ホール・1ホール平均 ${played.length ? (putts / played.length).toFixed(1) : 0}パット</p>
   </div>
-  <div class="card"><h2>クラブ別成功率</h2>${statTable(r.shots)}
-    <h3>ライ別</h3>${lieTable(r.shots)}</div>
+  <div class="card"><h2>クラブ別成功率</h2>${statTable(r.shots)}</div>
+  <div class="card"><h2>トラブル</h2>
+    <div class="stat3">
+      <div><b>${ob + pre4}</b><span class="muted">OB</span>${pre4 ? `<div class="muted" style="font-size:11px">うちプレ4 ${pre4}</div>` : ''}</div>
+      <div><b>${penalty}</b><span class="muted">ペナルティ</span></div>
+      <div><b>${bunker}</b><span class="muted">バンカー</span></div>
+    </div>
+    <p class="muted" style="margin:10px 0 0;text-align:center">罰打 合計${penStrokes}打</p></div>
   <div class="card"><h2>スコアカード</h2>
     <table class="card-sc">${half(1)}</table>
     <table class="card-sc" style="margin-top:10px">${half(10)}</table></div>
