@@ -93,6 +93,14 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .seg button.on { background: var(--accent); color: var(--on-accent); font-weight: 600; }
 .stat3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
 .stat3 b { display: block; font-size: 22px; }
+.hero { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center; margin-top: 4px; }
+.hero div { background: var(--bg); border-radius: 12px; padding: 14px 4px 12px; }
+.hero b { display: block; font-size: 56px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.hero small { display: block; font-size: 14px; color: var(--muted); margin-top: 4px; }
+.card-sc { font-size: 12px; table-layout: fixed; }
+.card-sc th, .card-sc td { padding: 5px 0; text-align: center; }
+.card-sc th:first-child, .card-sc td:first-child { text-align: left; width: 44px; color: var(--muted); }
+.sc-under { color: var(--accent); font-weight: 700; } .sc-dbl { color: var(--miss); }
 .toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--text); color: var(--bg);
   padding: 8px 14px; border-radius: 8px; font-size: 14px; z-index: 20; pointer-events: none; }
 </style>
@@ -215,7 +223,7 @@ function ask(message, okLabel, onOk) {
   m.querySelector('#askYes').onclick = () => { m.remove(); onOk(); render(); };
 }
 
-const ui = { tab: 'range', rangeId: null, roundId: null, club: null, hole: 1, lie: 1, yards: '', statsMode: 'range', statsClub: null };
+const ui = { tab: 'range', rangeId: null, roundId: null, summary: false, club: null, hole: 1, lie: 1, yards: '', statsMode: 'range', statsClub: null };
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const today = () => new Date().toLocaleDateString('sv-SE');
@@ -344,8 +352,9 @@ function renderRangeList() {
 function renderRound() {
   const r = db.rounds.find(x => x.id === ui.roundId);
   if (!r) return renderRoundList();
+  if (ui.summary) return renderRoundSummary(r);
   $('#title').textContent = r.course || 'ラウンド';
-  setHeaderBtn('一覧へ', () => { ui.roundId = null; render(); });
+  setHeaderBtn('終了', () => { ui.summary = true; render(); scrollTo(0, 0); });
   ui.club ??= db.clubs[0];
   const holeShots = r.shots.filter(x => x.hole === ui.hole);
   const par = r.pars[ui.hole - 1];
@@ -382,11 +391,54 @@ function renderRound() {
       <div class="row" style="flex:0 0 auto"><span class="tag ${s.ok ? '' : 'miss'}">${s.ok ? '成功' : esc(s.miss) + (penaltyOf(s) ? `（+${penaltyOf(s)}）` : '')}</span>
       <button class="chip" data-act="shotDel" data-id="${s.id}">✕</button></div></div>`).join('')
       : '<p class="muted">このホールはまだ記録がありません</p>'}
-    ${ui.hole < 18 ? `<button class="btn sub block" style="margin-top:10px" data-act="nextHole">次のホールへ →</button>` : ''}
+    ${ui.hole < 18 ? `<button class="btn sub block" style="margin-top:10px" data-act="nextHole">次のホールへ →</button>`
+      : `<button class="btn block" style="margin-top:10px" data-act="roundFinish">ラウンド終了・結果を見る</button>`}
   </div>
   <div class="card"><h2>このラウンドのクラブ別</h2>${statTable(r.shots)}
     <h3>ライ別</h3>${lieTable(r.shots)}</div>
   ${memoCard(r, '例：グリーンが速かった。前半はドライバーが安定、後半に疲れてダフリが増えた')}`;
+}
+// ラウンド後の結果ページ。スコアとパット数を大きく、その下にクラブ別成功率
+const isPutt = s => s.club === 'PT';
+function renderRoundSummary(r) {
+  $('#title').textContent = '結果';
+  setHeaderBtn('一覧へ', () => { ui.roundId = null; ui.summary = false; render(); });
+  const played = [...new Set(r.shots.map(s => s.hole))].sort((a, b) => a - b);
+  const strokes = strokesOf(r.shots);
+  const putts = r.shots.filter(isPutt).length;
+  const diff = strokes - played.reduce((a, h) => a + r.pars[h - 1], 0);
+  const pens = r.shots.filter(penaltyOf).length;
+  const half = (from) => {
+    const hs = Array.from({ length: 9 }, (_, i) => from + i);
+    const sc = h => strokesOf(r.shots.filter(s => s.hole === h));
+    const pt = h => r.shots.filter(s => s.hole === h && isPutt(s)).length;
+    const sum = f => hs.reduce((a, h) => a + f(h), 0);
+    const cell = h => {
+      const n = sc(h); if (!n) return '<td class="muted">-</td>';
+      const d = n - r.pars[h - 1];
+      return `<td class="${d < 0 ? 'sc-under' : d >= 2 ? 'sc-dbl' : ''}">${n}</td>`;
+    };
+    return `<tr><th>H</th>${hs.map(h => `<th>${h}</th>`).join('')}<th>${from === 1 ? 'OUT' : 'IN'}</th></tr>
+      <tr><td>Par</td>${hs.map(h => `<td>${r.pars[h - 1]}</td>`).join('')}<td>${sum(h => r.pars[h - 1])}</td></tr>
+      <tr><td>スコア</td>${hs.map(cell).join('')}<td><b>${sum(sc) || '-'}</b></td></tr>
+      <tr><td>パット</td>${hs.map(h => `<td>${sc(h) ? pt(h) : '-'}</td>`).join('')}<td>${sum(pt) || '-'}</td></tr>`;
+  };
+  return `
+  <div class="card">
+    <div class="muted">${esc(r.date)} ${esc(r.course)}</div>
+    <div class="hero">
+      <div><b>${strokes}</b><small>スコア（${diff > 0 ? '+' : ''}${diff}）</small></div>
+      <div><b>${putts}</b><small>パット</small></div>
+    </div>
+    <p class="muted" style="margin:10px 0 0;text-align:center">${played.length}ホール・1ホール平均 ${played.length ? (putts / played.length).toFixed(1) : 0}パット${pens ? `・OB/ペナルティ ${pens}回` : ''}</p>
+  </div>
+  <div class="card"><h2>クラブ別成功率</h2>${statTable(r.shots)}
+    <h3>ライ別</h3>${lieTable(r.shots)}</div>
+  <div class="card"><h2>スコアカード</h2>
+    <table class="card-sc">${half(1)}</table>
+    <table class="card-sc" style="margin-top:10px">${half(10)}</table></div>
+  ${r.memo ? `<div class="card"><h2>今日のメモ</h2><div style="white-space:pre-wrap;line-height:1.6">${esc(r.memo)}</div></div>` : ''}
+  <button class="btn ghost block" data-act="roundResume">記録の画面に戻る（修正する）</button>`;
 }
 function scoreText(r) {
   const played = [...new Set(r.shots.map(s => s.hole))];
@@ -411,7 +463,8 @@ function renderRoundList() {
     ${list.length ? list.map(r => {
       const ok = r.shots.filter(x => x.ok).length;
       return `<div class="list-item"><div><b>${r.date}</b> ${esc(r.course)}<div class="muted">${scoreText(r)}・成功率${pct(ok, r.shots.length)}%</div>${memoPreview(r)}</div>
-      <div class="row" style="flex:0 0 auto"><button class="btn sub" data-act="roundOpen" data-id="${r.id}">開く</button>
+      <div class="row" style="flex:0 0 auto"><button class="btn sub" data-act="roundResult" data-id="${r.id}">結果</button>
+      <button class="btn ghost" data-act="roundOpen" data-id="${r.id}">開く</button>
       <button class="btn danger" data-act="roundDel" data-id="${r.id}">削除</button></div></div>`;
     }).join('') : '<p class="muted">まだ記録がありません</p>'}
   </div>`;
@@ -515,13 +568,16 @@ const actions = {
   rangeUndo() { curRange().shots.pop(); save(); },
   roundStart() {
     const r = { id: uid(), date: $('#rdDate').value || today(), course: $('#rdCourse').value.trim(), pars: Array(18).fill(4), shots: [] };
-    db.rounds.push(r); save(); ui.roundId = r.id; ui.hole = 1; ui.lie = 1; ui.club = db.clubs[0];
+    db.rounds.push(r); save(); ui.roundId = r.id; ui.summary = false; ui.hole = 1; ui.lie = 1; ui.club = db.clubs[0];
   },
   roundOpen(el) {
-    ui.roundId = el.dataset.id;
+    ui.roundId = el.dataset.id; ui.summary = false;
     const r = curRound();
     ui.hole = r.shots.length ? r.shots[r.shots.length - 1].hole : 1; ui.lie = 1; ui.club = db.clubs[0];
   },
+  roundResult(el) { ui.roundId = el.dataset.id; ui.summary = true; },
+  roundFinish() { ui.summary = true; setTimeout(() => scrollTo(0, 0)); },
+  roundResume() { ui.summary = false; },
   roundDel(el) { ask('このラウンドを削除しますか？', '削除', () => { db.rounds = db.rounds.filter(x => x.id !== el.dataset.id); save(); }); },
   roundOk() { addRoundShot(true); },
   roundMiss(el) { addRoundShot(false, el.dataset.miss); },
