@@ -87,6 +87,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .holes button { padding: 8px 0; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 13px; }
 .holes button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .holes button small { display: block; font-size: 10px; opacity: .75; }
+.putts { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.putts button { padding: 12px 0; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 18px; font-weight: 600; }
+.putts button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .lie1 { color: var(--accent); } .lie2 { color: var(--warn); } .lie3 { color: var(--miss); }
 .seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
 .seg button { flex: 1; border: 0; background: var(--card); color: var(--muted); padding: 10px; font-size: 14px; }
@@ -127,11 +130,28 @@ const LIE_MARK = { 1: '◎', 2: '○', 3: '△' };
 const ROUND_TROUBLES = { OB: 1, 'OB プレ4': 2, 'ペナルティ': 1, 'バンカー': 0 };
 const penaltyOf = s => (!s.ok && ROUND_TROUBLES[s.miss]) || 0;
 const strokesOf = shots => shots.reduce((a, s) => a + 1 + penaltyOf(s), 0);
+// パットはショットとして記録せず、ホールごとのパット数（r.putts、未入力は null）だけを持つ
+const PUTTER = 'PT';
+const puttsAt = (r, h) => r.putts[h - 1] || 0;
+const holeStrokes = (r, h) => strokesOf(r.shots.filter(s => s.hole === h)) + puttsAt(r, h);
+const roundStrokes = r => strokesOf(r.shots) + r.putts.reduce((a, n) => a + (n || 0), 0);
+const playedHoles = r => Array.from({ length: 18 }, (_, i) => i + 1)
+  .filter(h => r.putts[h - 1] != null || r.shots.some(s => s.hole === h));
+// 以前の形式（PT で1打ずつ記録）のラウンドは、ホールごとのパット数に置き換える
+function migrate(d) {
+  for (const r of d.rounds) {
+    if (r.putts) continue;
+    r.putts = Array(18).fill(null);
+    for (const s of r.shots) if (s.club === PUTTER) r.putts[s.hole - 1] = (r.putts[s.hole - 1] || 0) + 1;
+    r.shots = r.shots.filter(s => s.club !== PUTTER);
+  }
+  return d;
+}
 
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(STORE_KEY));
-    if (d && d.clubs) return d;
+    if (d && d.clubs) return migrate(d);
   } catch (e) {}
   return { clubs: [...DEFAULT_CLUBS], misses: [...DEFAULT_MISSES], rangeSessions: [], rounds: [] };
 }
@@ -203,7 +223,8 @@ async function initCloud() {
       else if (kind === 'range') next.rangeSessions.push(v);
       else if (kind === 'round') next.rounds.push(v);
     }
-    db = next;
+    db = migrate(next);
+    save();
     try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); } catch (e) {}
     if (ui.rangeId && !curRange()) ui.rangeId = null;
     if (ui.roundId && !curRound()) ui.roundId = null;
@@ -276,9 +297,9 @@ function lieTable(shots) {
       return `<tr><td class="lie${l}"><b>${LIE_MARK[l]} ${LIES[l]}</b></td><td class="num">${a.ok}/${a.n}</td><td class="num">${p}%</td><td><div class="bar"><i style="width:${p}%"></i></div></td></tr>`;
     }).join('') + '</table>';
 }
-function clubChips(selected, attr = 'data-club') {
-  return `<div class="chips">${db.clubs.map(c =>
-    `<button class="chip ${c === selected ? 'on' : ''}" ${attr}="${esc(c)}">${esc(c)}</button>`).join('')}</div>`;
+function clubChips(selected, clubs = db.clubs) {
+  return `<div class="chips">${clubs.map(c =>
+    `<button class="chip ${c === selected ? 'on' : ''}" data-club="${esc(c)}">${esc(c)}</button>`).join('')}</div>`;
 }
 function missButtons(action) {
   return db.misses.map(m => `<button class="missbtn" data-act="${action}" data-miss="${esc(m)}">${esc(m)}</button>`).join('');
@@ -355,18 +376,20 @@ function renderRound() {
   if (ui.summary) return renderRoundSummary(r);
   $('#title').textContent = r.course || 'ラウンド';
   setHeaderBtn('終了', () => { ui.summary = true; render(); scrollTo(0, 0); });
-  ui.club ??= db.clubs[0];
+  const shotClubs = db.clubs.filter(c => c !== PUTTER);
+  if (!shotClubs.includes(ui.club)) ui.club = shotClubs[0];
   const holeShots = r.shots.filter(x => x.hole === ui.hole);
   const par = r.pars[ui.hole - 1];
-  const total = strokesOf(r.shots);
+  const putts = r.putts[ui.hole - 1];
+  const total = roundStrokes(r);
   return `
   <div class="card">
     <div class="holes">${Array.from({ length: 18 }, (_, i) => {
-      const h = i + 1, n = strokesOf(r.shots.filter(x => x.hole === h));
+      const h = i + 1, n = holeStrokes(r, h);
       return `<button class="${h === ui.hole ? 'on' : ''}" data-hole="${h}">${h}<small>${n || '-'}</small></button>`;
     }).join('')}</div>
     <div class="row" style="margin-top:10px">
-      <div><b style="font-size:18px">${ui.hole}番</b> <span class="muted">${strokesOf(holeShots)}打</span></div>
+      <div><b style="font-size:18px">${ui.hole}番</b> <span class="muted">${holeStrokes(r, ui.hole)}打</span></div>
       <div><select id="parSel">${[3, 4, 5].map(p => `<option ${p === par ? 'selected' : ''} value="${p}">Par ${p}</option>`).join('')}</select></div>
       <div class="muted" style="text-align:right">合計 ${total}打</div>
     </div>
@@ -377,7 +400,7 @@ function renderRound() {
     <input id="yards" type="number" inputmode="numeric" min="0" max="700" placeholder="例：150" value="${esc(ui.yards)}" style="margin-bottom:4px">
     <label>ライ</label>
     <div class="seg">${[1, 2, 3].map(l => `<button class="${l === ui.lie ? 'on' : ''}" data-lie="${l}">${LIE_MARK[l]} ${LIES[l]}</button>`).join('')}</div>
-    <label>クラブ</label>${clubChips(ui.club)}
+    <label>クラブ</label>${clubChips(ui.club, shotClubs)}
     <div class="big">
       <button class="btn ok" data-act="roundOk">◯ 成功</button>
       ${missButtons('roundMiss')}
@@ -385,12 +408,17 @@ function renderRound() {
     <div class="trouble">${Object.entries(ROUND_TROUBLES).map(([m, pen]) =>
       `<button class="missbtn" data-act="roundMiss" data-miss="${esc(m)}">${esc(m)}${pen ? `<small style="display:block;font-weight:400">+${pen}打</small>` : ''}</button>`).join('')}</div>
   </div>
+  <div class="card"><h2>パット数</h2>
+    <div class="putts">${[0, 1, 2, 3, 4, 5].map(n => `<button class="${n === putts ? 'on' : ''}" data-putts="${n}">${n}</button>`).join('')}</div>
+    <p class="muted" style="margin:6px 0 0">${putts == null ? 'グリーン上で打った数を選んでください' : 'もう一度押すと取り消せます'}</p>
+  </div>
   <div class="card"><h2>${ui.hole}番の記録</h2>
     ${holeShots.length ? holeShots.map((s, i) => `<div class="list-item">
       <div>${strokesOf(holeShots.slice(0, i)) + 1}. <b>${esc(s.club)}</b> <span class="lie${s.lie}">${LIE_MARK[s.lie]}${LIES[s.lie]}</span>${s.yards ? ` <span class="muted">残り${s.yards}y</span>` : ''}</div>
       <div class="row" style="flex:0 0 auto"><span class="tag ${s.ok ? '' : 'miss'}">${s.ok ? '成功' : esc(s.miss) + (penaltyOf(s) ? `（+${penaltyOf(s)}）` : '')}</span>
       <button class="chip" data-act="shotDel" data-id="${s.id}">✕</button></div></div>`).join('')
-      : '<p class="muted">このホールはまだ記録がありません</p>'}
+      : putts == null ? '<p class="muted">このホールはまだ記録がありません</p>' : ''}
+    ${putts != null ? `<div class="list-item"><div><b>パット</b></div><span class="tag">${putts}パット</span></div>` : ''}
     ${ui.hole < 18 ? `<button class="btn sub block" style="margin-top:10px" data-act="nextHole">次のホールへ →</button>`
       : `<button class="btn block" style="margin-top:10px" data-act="roundFinish">ラウンド終了・結果を見る</button>`}
   </div>
@@ -399,21 +427,20 @@ function renderRound() {
   ${memoCard(r, '例：グリーンが速かった。前半はドライバーが安定、後半に疲れてダフリが増えた')}`;
 }
 // ラウンド後の結果ページ。スコアとパット数を大きく、その下にクラブ別成功率
-const isPutt = s => s.club === 'PT';
 function renderRoundSummary(r) {
   $('#title').textContent = '結果';
   setHeaderBtn('一覧へ', () => { ui.roundId = null; ui.summary = false; render(); });
-  const played = [...new Set(r.shots.map(s => s.hole))].sort((a, b) => a - b);
-  const strokes = strokesOf(r.shots);
-  const putts = r.shots.filter(isPutt).length;
+  const played = playedHoles(r);
+  const strokes = roundStrokes(r);
+  const putts = played.reduce((a, h) => a + puttsAt(r, h), 0);
   const diff = strokes - played.reduce((a, h) => a + r.pars[h - 1], 0);
   const cnt = m => r.shots.filter(s => !s.ok && s.miss === m).length;
   const ob = cnt('OB'), pre4 = cnt('OB プレ4'), penalty = cnt('ペナルティ'), bunker = cnt('バンカー');
   const penStrokes = r.shots.reduce((a, s) => a + penaltyOf(s), 0);
   const half = (from) => {
     const hs = Array.from({ length: 9 }, (_, i) => from + i);
-    const sc = h => strokesOf(r.shots.filter(s => s.hole === h));
-    const pt = h => r.shots.filter(s => s.hole === h && isPutt(s)).length;
+    const sc = h => played.includes(h) ? holeStrokes(r, h) : 0;
+    const pt = h => puttsAt(r, h);
     const sum = f => hs.reduce((a, h) => a + f(h), 0);
     const cell = h => {
       const n = sc(h); if (!n) return '<td class="muted">-</td>';
@@ -449,8 +476,8 @@ function renderRoundSummary(r) {
   <button class="btn ghost block" data-act="roundResume">記録の画面に戻る（修正する）</button>`;
 }
 function scoreText(r) {
-  const played = [...new Set(r.shots.map(s => s.hole))];
-  const strokes = strokesOf(r.shots);
+  const played = playedHoles(r);
+  const strokes = roundStrokes(r);
   const parSum = played.reduce((a, h) => a + r.pars[h - 1], 0);
   const diff = strokes - parSum;
   return `${strokes}打（${played.length}H, ${diff > 0 ? '+' : ''}${diff}）`;
@@ -465,7 +492,7 @@ function renderRoundList() {
     <div class="row"><div><label>日付</label><input type="date" id="rdDate" value="${today()}"></div>
     <div><label>コース名</label><input id="rdCourse" placeholder="〇〇カントリー"></div></div>
     <button class="btn block" style="margin-top:12px" data-act="roundStart">ラウンド開始</button>
-    <p class="muted">パットも PT で1打ずつ記録すると、スコアも自動で数えます。</p>
+    <p class="muted">ショットを記録し、パットはホールごとにパット数だけ選ぶと、スコアも自動で数えます。</p>
   </div>
   <div class="card"><h2>履歴</h2>
     ${list.length ? list.map(r => {
@@ -575,7 +602,7 @@ const actions = {
   rangeMiss(el) { curRange().shots.push({ club: ui.club, ok: false, miss: el.dataset.miss }); save(); toast(`${ui.club}: ${el.dataset.miss}`); },
   rangeUndo() { curRange().shots.pop(); save(); },
   roundStart() {
-    const r = { id: uid(), date: $('#rdDate').value || today(), course: $('#rdCourse').value.trim(), pars: Array(18).fill(4), shots: [] };
+    const r = { id: uid(), date: $('#rdDate').value || today(), course: $('#rdCourse').value.trim(), pars: Array(18).fill(4), putts: Array(18).fill(null), shots: [] };
     db.rounds.push(r); save(); ui.roundId = r.id; ui.summary = false; ui.hole = 1; ui.lie = 1; ui.club = db.clubs[0];
   },
   roundOpen(el) {
@@ -621,7 +648,7 @@ function importData(e) {
   file.text().then(t => {
     const d = JSON.parse(t);
     if (!d.clubs || !d.rangeSessions || !d.rounds) throw new Error();
-    ask('現在のデータを上書きしてインポートしますか？', '上書き', () => { db = d; save(); toast('インポートしました'); });
+    ask('現在のデータを上書きしてインポートしますか？', '上書き', () => { db = migrate(d); save(); toast('インポートしました'); });
   }).catch(() => toast('ファイルを読み込めませんでした'));
 }
 
@@ -638,6 +665,10 @@ document.addEventListener('click', e => {
   else if (el.dataset.club) ui.club = el.dataset.club;
   else if (el.dataset.hole) { ui.hole = +el.dataset.hole; ui.lie = 1; ui.yards = ''; }
   else if (el.dataset.lie) ui.lie = +el.dataset.lie;
+  else if (el.dataset.putts) {
+    const r = curRound(), n = +el.dataset.putts;
+    r.putts[ui.hole - 1] = r.putts[ui.hole - 1] === n ? null : n; save();
+  }
   else if (el.dataset.mode) ui.statsMode = el.dataset.mode;
   else if (el.dataset.sclub) ui.statsClub = el.dataset.sclub;
   else if (el.dataset.act && actions[el.dataset.act]) actions[el.dataset.act](el);
